@@ -1,5 +1,5 @@
 [project]
-name = "image-classifier"
+name = "cifar10c-calibration"
 version = "0.1.0"
 description = "Accuracy and calibration of CIFAR-10 classifiers under distribution shift (CIFAR-10-C)."
 readme = "README.md"
