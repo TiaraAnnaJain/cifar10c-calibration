@@ -1,34 +1,58 @@
-"""Tests for the training and inference loops, on a tiny synthetic problem."""
+"""Tests for the trainer and inference loop, on a tiny synthetic problem."""
+
+from pathlib import Path
 
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from cifar10c_calibration.engine import predict_logits, train_one_epoch
+from cifar10c_calibration.config import TrainConfig
+from cifar10c_calibration.engine import Trainer, predict_logits
 
 DEVICE = torch.device("cpu")
 
 
 def _toy_loader(shuffle: bool = True) -> DataLoader[tuple[torch.Tensor, ...]]:
-    """64 points in 2D; the class is 1 when the first coordinate is positive."""
     generator = torch.Generator().manual_seed(0)
     x = torch.randn(64, 2, generator=generator)
     y = (x[:, 0] > 0).long()
     return DataLoader(TensorDataset(x, y), batch_size=16, shuffle=shuffle)
 
 
-def test_training_reduces_loss() -> None:
+def _toy_config(tmp_path: Path) -> TrainConfig:
+    return TrainConfig(epochs=20, lr=0.5, weight_decay=0.0, output_dir=tmp_path)
+
+
+def test_fit_reduces_loss(tmp_path: Path) -> None:
     torch.manual_seed(0)
-    model = nn.Linear(2, 2)
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.5)
-    loader = _toy_loader()
+    trainer = Trainer(nn.Linear(2, 2), _toy_config(tmp_path), DEVICE)
 
-    first = train_one_epoch(model, loader, optimizer, DEVICE)
-    for _ in range(20):
-        last = train_one_epoch(model, loader, optimizer, DEVICE)
+    history = trainer.fit(_toy_loader())
 
-    assert last.loss < first.loss
-    assert last.accuracy > 0.9
+    assert len(history) == 20
+    assert history[-1].loss < history[0].loss
+    assert history[-1].accuracy > 0.9
+
+
+def test_learning_rate_decays_to_zero(tmp_path: Path) -> None:
+    trainer = Trainer(nn.Linear(2, 2), _toy_config(tmp_path), DEVICE)
+
+    trainer.fit(_toy_loader())
+
+    assert trainer.optimizer.param_groups[0]["lr"] < 1e-6
+
+
+def test_save_checkpoint_round_trips(tmp_path: Path) -> None:
+    config = _toy_config(tmp_path)
+    trainer = Trainer(nn.Linear(2, 2), config, DEVICE)
+
+    trainer.save_checkpoint()
+    saved = torch.load(config.checkpoint_path)
+
+    restored = nn.Linear(2, 2)
+    restored.load_state_dict(saved["model_state"])
+    assert torch.equal(restored.weight, trainer.model.state_dict()["weight"])
+    assert saved["config"]["seed"] == config.seed
 
 
 def test_predict_logits_shapes_and_order() -> None:
