@@ -1,7 +1,10 @@
 """Training configuration"""
 
+import dataclasses
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Self
 
 
 @dataclass(frozen=True)
@@ -20,6 +23,34 @@ class TrainConfig:
 
     data_dir: Path = field(default_factory=lambda: Path("data"))
     output_dir: Path = field(default_factory=lambda: Path("outputs"))
+
+    @classmethod
+    def from_toml(cls, path: Path) -> Self:
+        """Load a config from a TOML file. Missing keys keep their default values."""
+        with path.open("rb") as file:
+            values = tomllib.load(file)
+
+        unknown = values.keys() - {f.name for f in dataclasses.fields(cls)}
+        if unknown:
+            raise ValueError(f"Unknown config keys in {path}: {sorted(unknown)}")
+
+        for key in ("data_dir", "output_dir"):
+            if key in values:
+                values[key] = Path(values[key])
+        return cls(**values)
+
+    def with_overrides(self, **overrides: Any) -> Self:
+        """Returns a copy with the given fields replaced; "None" values are skipped"""
+        given = {key: value for key, value in overrides.items() if value is not None}
+        return dataclasses.replace(self, **given)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Plain dict of every field. Paths become strings"""
+        dictionary = {
+            key: str(value) if isinstance(value, Path) else value
+            for key, value in dataclasses.asdict(self).items()
+        }
+        return dictionary
 
     @property
     def checkpoint_path(self) -> Path:
