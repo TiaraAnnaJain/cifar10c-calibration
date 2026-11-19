@@ -9,8 +9,8 @@ import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import DataLoader
 
-from cifar10c_calibration.config import TrainConfig
 from cifar10c_calibration.calibration.metrics import accuracy
+from cifar10c_calibration.config import TrainConfig
 
 
 class EpochStats(NamedTuple):
