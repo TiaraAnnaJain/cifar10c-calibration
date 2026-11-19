@@ -1,7 +1,7 @@
 """Training and inference loops."""
 
-import dataclasses
-from pathlib import Path
+import json
+import time
 from typing import Any, NamedTuple
 
 import torch
@@ -10,6 +10,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from cifar10c_calibration.config import TrainConfig
+from cifar10c_calibration.metrics import accuracy
 
 
 class EpochStats(NamedTuple):
@@ -37,6 +38,8 @@ class Trainer:
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer, T_max=config.epochs
         )
+        self.history: list[EpochStats] = []
+        self.train_minutes = 0.0
 
     def fit(self, train_loader: DataLoader[Any]) -> list[EpochStats]:
         """Train for ``config.epochs`` epochs.
@@ -44,29 +47,49 @@ class Trainer:
         Returns:
             The training loss and accuracy of every epoch, in order.
         """
-        history = []
+        start = time.perf_counter()
         for epoch in range(1, self.config.epochs + 1):
             stats = self._train_one_epoch(train_loader)
             self.scheduler.step()
-            history.append(stats)
+            self.history.append(stats)
             print(
                 f"epoch {epoch:>3}/{self.config.epochs}  "
                 f"loss {stats.loss:.4f}  acc {stats.accuracy:.4f}"
             )
-        return history
+        self.train_minutes = (time.perf_counter() - start) / 60
+        return self.history
+
+    def evaluate(self, loader: DataLoader[Any]) -> float:
+        """Accuracy of the current model on loader."""
+        logits, labels = predict_logits(self.model, loader, self.device)
+        score = accuracy(logits, labels)
+        return score
 
     def save_checkpoint(self) -> None:
         """Save the weights and the config that produced them."""
         path = self.config.checkpoint_path
         path.parent.mkdir(parents=True, exist_ok=True)
-        config = {
-            key: str(value) if isinstance(value, Path) else value
-            for key, value in dataclasses.asdict(self.config).items()
+        checkpoint = {
+            "model_state": self.model.state_dict(),
+            "config": self.config.to_dict(),
         }
-        torch.save({"model_state": self.model.state_dict(), "config": config}, path)
+        torch.save(checkpoint, path)
+
+    def save_summary(self, **results: float) -> None:
+        """Save the config, training history and results as readable JSON."""
+        path = self.config.summary_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        summary = {
+            "config": self.config.to_dict(),
+            "device": str(self.device),
+            "train_minutes": round(self.train_minutes, 2),
+            **results,
+            "history": [stats._asdict() for stats in self.history],
+        }
+        path.write_text(json.dumps(summary, indent=2))
 
     def _train_one_epoch(self, loader: DataLoader[Any]) -> EpochStats:
-        """Run one full pass over ``loader``, updating the model's weights."""
+        """Run one full pass over loader, updating the model's weights."""
         self.model.train()
         total_loss = 0.0
         total_correct = 0
@@ -87,7 +110,8 @@ class Trainer:
             total_correct += (logits.argmax(dim=1) == labels).sum().item()
             total_images += batch_size
 
-        return EpochStats(total_loss / total_images, total_correct / total_images)
+        stats = EpochStats(total_loss / total_images, total_correct / total_images)
+        return stats
 
 
 @torch.no_grad()
@@ -110,4 +134,6 @@ def predict_logits(
         all_logits.append(logits.cpu())
         all_labels.append(labels)
 
-    return torch.cat(all_logits), torch.cat(all_labels)
+    logits_cpu = torch.cat(all_logits)
+    labels_cpu = torch.cat(all_labels)
+    return logits_cpu, labels_cpu

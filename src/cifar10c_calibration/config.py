@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Self
 
+FAST_DEV_RUN_IMAGES = 256
+
 
 @dataclass(frozen=True)
 class TrainConfig:
@@ -20,6 +22,7 @@ class TrainConfig:
 
     val_size: int = 5_000
     num_workers: int = 2
+    max_images: int | None = None
 
     data_dir: Path = field(default_factory=lambda: Path("data"))
     output_dir: Path = field(default_factory=lambda: Path("outputs"))
@@ -52,7 +55,25 @@ class TrainConfig:
         }
         return dictionary
 
+    def fast_dev_run(self) -> Self:
+        """1 epoch copy for testing the pipeline, saved in its own folder"""
+        config = dataclasses.replace(
+            self,
+            epochs=1,
+            num_workers=0,
+            max_images=FAST_DEV_RUN_IMAGES,
+            output_dir=self.output_dir / "fast_dev_run",
+        )
+        return config
+
     @property
     def checkpoint_path(self) -> Path:
         """Where this seed's trained weights are saved"""
-        return self.output_dir / "checkpoints" / f"resnet18_seed{self.seed}.pt"
+        path = self.output_dir / "checkpoints" / f"resnet18_seed{self.seed}.pt"
+        return path
+
+    @property
+    def summary_path(self) -> Path:
+        """Where this seed's readable training summary is saved."""
+        path = self.checkpoint_path.with_suffix(".json")
+        return path

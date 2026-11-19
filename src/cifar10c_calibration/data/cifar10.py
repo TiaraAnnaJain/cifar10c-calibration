@@ -19,11 +19,18 @@ class CIFAR10Data:
 
         train_full = self._load(train=True, augment=True)
         val_full = self._load(train=True, augment=False)
-        self.test_set = self._load(train=False, augment=False)
+        test_full = self._load(train=False, augment=False)
 
         train_idx, val_idx = split_indices(len(train_full), config.val_size)
+        test_idx = list(range(len(test_full)))
+
+        if config.max_images is not None:
+            n = config.max_images
+            train_idx, val_idx, test_idx = train_idx[:n], val_idx[:n], test_idx[:n]
+
         self.train_set = Subset(train_full, train_idx)
         self.val_set = Subset(val_full, val_idx)
+        self.test_set = Subset(test_full, test_idx)
 
     def train_loader(self) -> DataLoader[Any]:
         """Augmented training images, reshuffled every epoch."""
