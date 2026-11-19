@@ -5,7 +5,7 @@ import math
 import pytest
 import torch
 
-from cifar10c_calibration.metrics import accuracy, brier, ece, nll, reliability_bins
+from cifar10c_calibration.calibration.metrics import accuracy, brier, ece, nll, reliability_bins
 
 
 def _confident_logits(confidence: float, labels: torch.Tensor) -> torch.Tensor:
