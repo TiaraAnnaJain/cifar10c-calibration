@@ -67,6 +67,29 @@ class Evaluator:
         table["seed"] = table["seed"].astype("Int64")
         return table
 
+    def pooled_logits(
+        self, names: list[str], seed: int
+    ) -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
+        """Each method's logits and labels on the sets "names", joined together."""
+        single, scaled, combined, all_labels = [], [], [], []
+        for name in names:
+            logits, labels = self.seed_predictions[seed][name]
+            members = [
+                predictions[name][0] for predictions in self.seed_predictions.values()
+            ]
+            single.append(logits)
+            scaled.append(self.scalers[seed].scale(logits))
+            combined.append(ensemble_logits(members))
+            all_labels.append(labels)
+
+        labels = torch.cat(all_labels)
+        pooled = {
+            "single": (torch.cat(single), labels),
+            "temperature": (torch.cat(scaled), labels),
+            "ensemble": (torch.cat(combined), labels),
+        }
+        return pooled
+
     def _fit_scaler(self, predictions: Predictions) -> TemperatureScaler:
         """A temperature scaler fitted on validation only, never on test."""
         val_logits, val_labels = predictions["val"]

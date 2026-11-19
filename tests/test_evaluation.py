@@ -57,3 +57,16 @@ def test_one_temperature_per_seed() -> None:
     evaluator = Evaluator({seed: _fake_predictions(seed) for seed in SEEDS})
     assert list(evaluator.temperatures) == SEEDS
     assert all(t > 0 for t in evaluator.temperatures.values())
+
+
+def test_pooled_logits_joins_sets_for_every_method() -> None:
+    evaluator = Evaluator({seed: _fake_predictions(seed) for seed in SEEDS})
+
+    pooled = evaluator.pooled_logits(["fog_s5", "snow_s5"], seed=0)
+
+    assert set(pooled) == {"single", "temperature", "ensemble"}
+    for logits, labels in pooled.values():
+        assert logits.shape == (2 * N_IMAGES, 10)
+        assert labels.shape == (2 * N_IMAGES,)
+    single_logits = pooled["single"][0]
+    assert torch.equal(single_logits[:N_IMAGES], _fake_predictions(0)["fog_s5"][0])

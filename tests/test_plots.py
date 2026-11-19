@@ -4,8 +4,13 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+import torch
 
-from cifar10c_calibration.plots import plot_metric_vs_severity, severity_summary
+from cifar10c_calibration.plots import (
+    plot_metric_vs_severity,
+    plot_reliability_diagrams,
+    severity_summary,
+)
 
 METHODS = ("single", "temperature", "ensemble")
 
@@ -47,5 +52,15 @@ def test_plot_is_saved(tmp_path: Path) -> None:
     path = tmp_path / "figures" / "accuracy.png"
 
     plot_metric_vs_severity(_fake_results(), "accuracy", path)
+
+    assert path.stat().st_size > 0
+
+
+def test_reliability_diagrams_are_saved(tmp_path: Path) -> None:
+    labels = torch.arange(100) % 10
+    method_logits = {method: (torch.randn(100, 10), labels) for method in METHODS}
+    path = tmp_path / "figures" / "reliability.png"
+
+    plot_reliability_diagrams(method_logits, "Fake data", path)
 
     assert path.stat().st_size > 0
