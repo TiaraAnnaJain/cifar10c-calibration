@@ -1,5 +1,6 @@
 """Tests for the trainer and inference loop, on a tiny synthetic problem."""
 
+import json
 from pathlib import Path
 
 import torch
@@ -75,3 +76,23 @@ def test_predict_logits_does_not_change_weights() -> None:
     assert all(
         torch.equal(b, a) for b, a in zip(before, model.parameters(), strict=True)
     )
+
+
+def test_evaluate_is_high_after_fit(tmp_path: Path) -> None:
+    torch.manual_seed(0)
+    trainer = Trainer(nn.Linear(2, 2), _toy_config(tmp_path), DEVICE)
+    trainer.fit(_toy_loader())
+    assert trainer.evaluate(_toy_loader(shuffle=False)) > 0.9
+
+
+def test_save_summary_writes_results_and_history(tmp_path: Path) -> None:
+    config = _toy_config(tmp_path)
+    trainer = Trainer(nn.Linear(2, 2), config, DEVICE)
+    trainer.fit(_toy_loader())
+
+    trainer.save_summary(val_accuracy=0.5)
+    summary = json.loads(config.summary_path.read_text())
+
+    assert summary["val_accuracy"] == 0.5
+    assert len(summary["history"]) == config.epochs
+    assert summary["config"]["seed"] == config.seed

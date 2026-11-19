@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from cifar10c_calibration.config import TrainConfig
+from cifar10c_calibration.config import FAST_DEV_RUN_IMAGES, TrainConfig
 
 PROJECT_CONFIG = Path(__file__).parents[1] / "configs" / "resnet18_cifar10.toml"
 
@@ -59,3 +59,15 @@ def test_to_dict_is_json_serialisable() -> None:
     as_dict = TrainConfig().to_dict()
     assert json.loads(json.dumps(as_dict)) == as_dict
     assert as_dict["data_dir"] == "data"
+
+
+def test_fast_dev_run_is_tiny_and_saved_separately() -> None:
+    config = TrainConfig(epochs=40).fast_dev_run()
+    assert config.epochs == 1
+    assert config.max_images == FAST_DEV_RUN_IMAGES
+    assert config.output_dir == Path("outputs/fast_dev_run")
+
+
+def test_summary_path_sits_next_to_checkpoint() -> None:
+    config = TrainConfig(seed=3)
+    assert config.summary_path == Path("outputs/checkpoints/resnet18_seed3.json")
