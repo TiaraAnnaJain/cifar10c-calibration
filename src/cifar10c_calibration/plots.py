@@ -5,6 +5,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import torch
+from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from cifar10c_calibration.calibration.metrics import NUM_BINS, ece, reliability_bins
@@ -14,6 +15,13 @@ METHOD_LABELS = {
     "temperature": "Temperature scaling",
     "ensemble": "Deep ensemble",
 }
+METHOD_COLORS = {
+    "single": "#e0709b",
+    "temperature": "#5b3fb8",
+    "ensemble": "#17804d",
+}
+DIAGONAL_COLOR = "#8a8a86"
+GRID_COLOR = "#e4e4e0"
 METRIC_LABELS = {
     "accuracy": "Accuracy",
     "ece": "ECE",
@@ -48,21 +56,26 @@ def plot_metric_vs_severity(results: pd.DataFrame, metric: str, path: Path) -> N
 
     for method, label in METHOD_LABELS.items():
         rows = summary[summary["method"] == method]
-        (line,) = axes.plot(rows["severity"], rows["median"], marker="o", label=label)
-        axes.fill_between(
+        color = METHOD_COLORS[method]
+        axes.plot(
             rows["severity"],
-            rows["q25"],
-            rows["q75"],
-            color=line.get_color(),
-            alpha=0.2,
+            rows["median"],
+            color=color,
+            linewidth=2,
+            marker="o",
+            markersize=6,
+            label=label,
+        )
+        axes.fill_between(
+            rows["severity"], rows["q25"], rows["q75"], color=color, alpha=0.15
         )
 
     axes.set_xticks(range(6), ["clean", "1", "2", "3", "4", "5"])
     axes.set_xlabel("Corruption severity")
     axes.set_ylabel(METRIC_LABELS[metric])
     axes.set_title(f"{METRIC_LABELS[metric]} on CIFAR-10-C")
-    axes.grid(alpha=0.3)
-    axes.legend()
+    _style(axes)
+    axes.legend(frameon=False)
 
     _save(figure, path)
 
@@ -85,19 +98,31 @@ def plot_reliability_diagrams(
             bin_centres[has_images].numpy(),
             bins.accuracy[has_images].numpy(),
             width=1 / NUM_BINS,
-            edgecolor="black",
+            color=METHOD_COLORS[method],
+            edgecolor="white",  # thin gap between neighbouring bars
+            linewidth=1,
             label="Accuracy",
         )
-        axes.plot([0, 1], [0, 1], "--", color="grey", label="Perfect calibration")
+        axes.plot(
+            [0, 1], [0, 1], "--", color=DIAGONAL_COLOR, label="Perfect calibration"
+        )
         axes.set_title(f"{label} (ECE {ece(logits, labels):.3f})")
         axes.set_xlabel("Confidence")
         axes.set_xlim(0, 1)
         axes.set_ylim(0, 1)
+        _style(axes)
+        axes.legend(loc="upper left", frameon=False)
 
     all_axes[0].set_ylabel("Accuracy")
-    all_axes[0].legend(loc="upper left")
     figure.suptitle(title)
     _save(figure, path)
+
+
+def _style(axes: Axes) -> None:
+    """Light grid behind the data, and no top or right border."""
+    axes.grid(color=GRID_COLOR, linewidth=0.8)
+    axes.set_axisbelow(True)
+    axes.spines[["top", "right"]].set_visible(False)
 
 
 def _save(figure: Figure, path: Path) -> None:
