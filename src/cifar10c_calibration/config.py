@@ -77,3 +77,9 @@ class TrainConfig:
         """Where this seed's readable training summary is saved."""
         path = self.checkpoint_path.with_suffix(".json")
         return path
+
+    @property
+    def logits_path(self) -> Path:
+        """Where this seed's logits on every evaluation set are saved."""
+        path = self.output_dir / "logits" / f"resnet18_seed{self.seed}.pt"
+        return path

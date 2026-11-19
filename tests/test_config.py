@@ -71,3 +71,8 @@ def test_fast_dev_run_is_tiny_and_saved_separately() -> None:
 def test_summary_path_sits_next_to_checkpoint() -> None:
     config = TrainConfig(seed=3)
     assert config.summary_path == Path("outputs/checkpoints/resnet18_seed3.json")
+
+
+def test_logits_path_includes_seed() -> None:
+    config = TrainConfig(seed=3)
+    assert config.logits_path == Path("outputs/logits/resnet18_seed3.pt")
