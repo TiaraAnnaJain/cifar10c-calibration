@@ -1,6 +1,12 @@
 """Data pipelines: transforms, the train/val split and dataset loaders."""
 
 from cifar10c_calibration.data.cifar10 import CIFAR10Data
+from cifar10c_calibration.data.cifar10c import (
+    CORRUPTIONS,
+    SEVERITIES,
+    CIFAR10CData,
+    download_cifar10c,
+)
 from cifar10c_calibration.data.splits import SPLIT_SEED, split_indices
 from cifar10c_calibration.data.transforms import (
     CIFAR10_MEAN,
@@ -17,4 +23,8 @@ __all__ = [
     "eval_transform",
     "split_indices",
     "train_transform",
+    "CIFAR10CData",
+    "CORRUPTIONS",
+    "download_cifar10c",
+    "SEVERITIES",
 ]
